@@ -470,7 +470,7 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                               ((pmap.map_grid.find(Mo))->second)->occupied +=1;
                           }else{
                               grid2D * g = new grid2D();
-                              g->occupied += 1;
+                              g->occupied = 1;
                               g->a = i;g->b=j;
                               pmap.map_grid.insert(pair<string,grid2D *>(Mo,g));
 //                              cout<<"create-a,b"<<g->a<<","<<g->b<<endl;
@@ -481,6 +481,45 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                   it->has_project = true;
               }else if(it->hasChildren()){
                   cout<<"projector2D error\n";
+              }
+          }else{
+              //project
+              if(this->isNodeOccupied(*it) && !it->has_project){
+                  string Mo;//a0,b0;a1,b1
+                  int a0,b0,a1,b1;
+                  octomap::point3d nodeMin(x-0.5*size,y-0.5*size,0);
+                  octomap::point3d nodeMax(x+0.5*size,y+0.5*size,0);
+                  pmap.XY2ab(nodeMin,a0,b0);
+                  pmap.XY2ab(nodeMax,a1,b1);
+    //                  cout<<"a0,b0 "<<a0<<","<<b0<<endl;cout<<"a1,b1 "<<a1<<","<<b1<<endl;
+                  if(a0>a1){
+                      a0 = a0+a1;
+                      a1 = a0-a1;
+                      a0 = a0-a1;
+                  }
+                  if(b0>b1){
+                      b0 = b0+b1;
+                      b1 = b0-b1;
+                      b0 = b0-b1;
+                  }
+                  for(int i=a0;i<=a1;i++){
+                      if(i==0)
+                          i++;
+                      for(int j=b0;j<=b1;j++){
+                          if(j==0)
+                              j++;
+                          pmap.ab2Morton(i,j,Mo);
+    //                          cout<<"i,j,morton "<<i<<","<<j<<","<<Mo<<endl;
+                          int count = pmap.map_grid.count(Mo);
+                          if(count==0){
+                              grid2D * g = new grid2D();
+                              g->occupied = 0;
+                              g->a = i;g->b=j;
+                              pmap.map_grid.insert(pair<string,grid2D *>(Mo,g));
+                          }
+                      }
+                  }
+                  it->has_project = true;
               }
           }
       }

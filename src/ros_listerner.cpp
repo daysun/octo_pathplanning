@@ -31,7 +31,7 @@ octomap::ColorOcTree tree( 0.05 );
 int loopNum = -1;
 bool isFirstSet = false;
 Project2Dmap pMap(tree.getResolution());
-double zmin = 0.2,zmax = 2.5;//get it from orb-slam
+double zmin = 0.1,zmax = 2.7;//get it from orb-slam
 ros::Publisher marker_pub;
 
 //ofstream outfile("/home/daysun/GlobalTime.txt", ofstream::app);

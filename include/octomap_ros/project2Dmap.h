@@ -19,7 +19,7 @@ struct grid2D{
      float g;
      float f;  //f = g+h,a*
      grid2D(){
-         occupied = 0;
+         occupied = -1;//-1 initial /0 free /1+ occupied
      }
 };
 
@@ -101,7 +101,7 @@ public:
         visualization_msgs::MarkerArray mArray;
         map<string,grid2D *>::iterator it;
         for(it = map_grid.begin();it!=map_grid.end();it++,i++){
-            if((it->second)->occupied >0){
+            if((it->second)->occupied >=0){
 //                double x = (it->second)->a*resolution + originCoord.x();
 //                double y = (it->second)->b*resolution + originCoord.y();
                 visualization_msgs::Marker m_s;
@@ -123,9 +123,15 @@ public:
                 m_s.scale.y = 1;
                 m_s.scale.z = 0.2;
                 m_s.color.a = 1.0;
-                m_s.color.b = 1;
-                m_s.color.r = 1;
-                m_s.color.g = 0.5;
+                if((it->second)->occupied >0){
+                    m_s.color.b = 1;
+                    m_s.color.r = 1;
+                    m_s.color.g = 0.5;
+                }else{
+                    m_s.color.b = 1;
+                    m_s.color.r = 0;
+                    m_s.color.g = 0.5;
+                }
                 m_s.lifetime = ros::Duration();
                 mArray.markers.push_back(m_s);
             }
