@@ -1,5 +1,8 @@
 <launch> 
-<node pkg="octomap_ros" type="rcv_test" name="rcv_test" output="screen"></node>
+<node pkg="octomap_ros" type="rcv_test" name="rcv_test" output="screen">
+    <param name="pos" type="string" value="4,-2,2" />
+    <param name="goal" type="string" value="3,-1,2" />
+</node>
 
 <node pkg="rviz" type="rviz" name="rviz" args="-d $(find octomap_ros)/launch/octomap_ros.rviz" output="log"></node>
 

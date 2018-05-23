@@ -8,6 +8,9 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include "ros/ros.h"
+#include "UAV.h"
+#include "float.h"
+#include "math.h"
 
 using namespace std;
 
@@ -16,7 +19,7 @@ struct grid2D{
 //    string belong;
     int a,b;
      float h;
-     float g;
+     float g; //real cost
      float f;  //f = g+h,a*
      grid2D(){
          occupied = -1;//-1 initial /0 free /1+ occupied
@@ -26,11 +29,72 @@ struct grid2D{
 class Project2Dmap {
     double resolution;
     octomap::point3d originCoord;    
+    float TravelCost(octomap::point3d cur,octomap::point3d des){
+        return sqrt(pow(cur.x()-des.x(),2) + pow(cur.y()-des.y(),2));
+    }
+
+    bool isContainedQ(grid2D * s,  list<grid2D *> & Q){
+        list<grid2D *>::iterator it = Q.begin();
+        while(it != Q.end()){
+            if((s->a == (*it)->a) && (s->b == (*it)->b))
+                return true;
+            it++;
+        }
+        return false;
+    }
+
+    //true-collide, false-no collide
+    //due to the zmin-zmax contains the height of robot
+    //here we can simply consider the value of occupied
+    bool CollisionCheck(grid2D * slope,float rr){
+        int r = ceil(rr);//radius
+        int a = slope->a;
+        int b = slope->b;
+        for(int i=a-r;i<=a+r;i++){
+            for(int j=b-r;j<=b+r;j++){
+                string mor;
+                ab2Morton(i,j,mor);
+                int count = map_grid.count(mor);
+                if(count!=0){//find
+                    if( ((map_grid.find(mor))->second)->occupied >0 ){
+                        //collide
+                        return true;
+                    }
+                }else{//unknown
+                }
+            }
+        }
+        return false;
+    }
+
+    list<grid2D *>  AccessibleNeighbors(grid2D * slope,float rr){
+        list<grid2D *> list;
+        int r = ceil(rr);
+        int a = slope->a;
+        int b = slope->b;
+        for(int i=a-r;i<=a+r;i++){
+            for(int j=b-r;j<=b+r;j++){
+                string mor;
+                ab2Morton(i,j,mor);
+                int count = map_grid.count(mor);
+                if(count!=0){//find
+                    if( ((map_grid.find(mor))->second)->occupied == 0 ){
+                        //known and free
+                        list.push_back(slope);
+                    }
+                }//else{}//unknown-cant go there
+            }
+        }
+        return list;
+    }
 
 public:
     double zmin,zmax;
-    Project2Dmap(const float res):resolution(res){}
+    Project2Dmap(const float res):resolution(res){
+        find_goal = false;
+    }
     map<string,grid2D *> map_grid;
+    bool find_goal;
     void setOriginCoord(octomap::point3d o){
         originCoord.x()=o.x();
         originCoord.y()=o.y();
@@ -41,11 +105,11 @@ public:
         zmax = max;
     }
 
-    void XY2ab(octomap::point3d position, int & nx ,int & ny){
+    void XY2ab(octomap::point3d & position, int & nx ,int & ny){
          nx = (int)ceil(float(abs(position.x()-originCoord.x())/resolution));
          ny = (int)ceil(float(abs(position.y()-originCoord.y())/resolution));
-        nx == 0? nx =1:nx=nx;
-        ny == 0? ny =1:ny=ny;
+//        nx == 0? nx =1:nx=nx;
+//        ny == 0? ny =1:ny=ny;
         if(position.x() < originCoord.x()){
             nx *= -1;
         }
@@ -74,31 +138,109 @@ public:
         morton = xy_belong+ m;
     }
 
-    void XY2Morton(octomap::point3d position, string & morton){
+    void XY2Morton(double x,double y, string & morton){
         string xy_belong;
-        if(position.x() > originCoord.x()){
-            if(position.y() >originCoord.y())
+        if(x > originCoord.x()){
+            if(y >originCoord.y())
                 xy_belong = "A";
             else
                 xy_belong = "B";
         }else{
-            if(position.y()>originCoord.y())
+            if(y>originCoord.y())
                 xy_belong = "C";
             else
                 xy_belong = "D";
         }
-        int nx = (int)ceil(float(abs(position.x()-originCoord.x())/resolution));
-        int ny = (int)ceil(float(abs(position.y()-originCoord.y())/resolution));
-        nx == 0? nx =1:nx=nx;
-        ny == 0? ny =1:ny=ny;
+        int nx = (int)ceil(float(abs(x-originCoord.x())/resolution));
+        int ny = (int)ceil(float(abs(y-originCoord.y())/resolution));
+//        nx == 0? nx =1:nx=nx;
+//        ny == 0? ny =1:ny=ny;
         string m = countMorton(nx,ny);
         morton = xy_belong+ m;
     }
 
-    void show2Dmap(ros::Publisher marker_pub){
-        int i=0;
+    bool checkGoal(daysun::UAV * robot){
+        if(robot->getGoal().z()<=zmax && robot->getGoal().z()>=zmin){
+            string morton;
+            XY2Morton(robot->getGoal().x(),robot->getGoal().y(),morton);
+            //find the grid-initial
+            if(map_grid.count(morton)==0){
+                return false;
+            }else{
+                cout<<"find goal\n";
+                return true;
+            }
+        }else{
+            cout<<"test-goal error, out of range\n";
+            cout<<"z,zmax,zmin "<<robot->getGoal().z()<<","<<zmax<<","<<zmin<<endl;
+            return false;
+        }
+    }
+
+    void show2Dmap(ros::Publisher marker_pub,daysun::UAV * robot){
+        int i=2;
         ros::Rate r(100);
+        //for goal
         visualization_msgs::MarkerArray mArray;
+        {
+            visualization_msgs::Marker m;
+            m.ns  = "project2Dmap";
+            m.header.frame_id = "/my_frame";
+            m.header.stamp = ros::Time::now();
+            m.id = 0;
+            m.type = visualization_msgs::Marker::SPHERE;
+            m.action = visualization_msgs::Marker::ADD;
+            int a,b;
+            octomap::point3d temp(robot->getGoal().x(),robot->getGoal().y(),robot->getGoal().z());
+            XY2ab(temp,a,b);
+            m.pose.position.x = a;
+            m.pose.position.y = b;
+            m.pose.position.z = 0;
+            m.pose.orientation.x = 0;
+            m.pose.orientation.y = 0;
+            m.pose.orientation.z = 1;
+            m.pose.orientation.w = 1;
+            m.scale.x = robot->getRadius()/resolution;
+            m.scale.y = robot->getRadius()/resolution;
+            m.scale.z = 0.4;
+            m.color.a = 1.0;
+            m.color.b = 0;
+            m.color.r = 1;
+            m.color.g = 1;
+            m.lifetime = ros::Duration();
+            mArray.markers.push_back(m);
+
+        }
+        //for pos
+        {
+            visualization_msgs::Marker m;
+            m.ns  = "project2Dmap";
+            m.header.frame_id = "/my_frame";
+            m.header.stamp = ros::Time::now();
+            m.id = 1;
+            m.type = visualization_msgs::Marker::SPHERE;
+            m.action = visualization_msgs::Marker::ADD;
+            int a,b;
+            octomap::point3d temp(robot->getPosition().x(),robot->getPosition().y(),robot->getPosition().z());
+            XY2ab(temp,a,b);
+            m.pose.position.x = a;
+            m.pose.position.y = b;
+            m.pose.position.z = 0;
+            m.pose.orientation.x = 0;
+            m.pose.orientation.y = 0;
+            m.pose.orientation.z = 1;
+            m.pose.orientation.w = 1;
+            m.scale.x = robot->getRadius()/resolution;
+            m.scale.y = robot->getRadius()/resolution;
+            m.scale.z = 0.4;
+            m.color.a = 1.0;
+            m.color.b = 0.5;
+            m.color.r = 1;
+            m.color.g = 1;
+            m.lifetime = ros::Duration();
+            mArray.markers.push_back(m);
+
+        }
         map<string,grid2D *>::iterator it;
         for(it = map_grid.begin();it!=map_grid.end();it++,i++){
             if((it->second)->occupied >=0){
@@ -142,6 +284,61 @@ public:
                 marker_pub.publish(mArray);
             }
         }
+    }
+
+    void computeCost(daysun::UAV * robot){
+        int pos_a,pos_b;
+        octomap::point3d temp(robot->getPosition().x(),robot->getPosition().y(),robot->getPosition().z());
+        XY2ab(temp,pos_a,pos_b);
+         list<grid2D *> Q; //list of cell to be computed
+         list<grid2D *> closed;//no checking again
+         list<grid2D *> traversability; //can travel
+         string morton;
+         XY2Morton(robot->getGoal().x(),robot->getGoal().y(),morton);
+         //find the grid-initial
+         if(map_grid.count(morton)==0){
+             cout<<"cant find goal grid\n";
+             find_goal = false;
+             return;
+         }else{
+             map<string,grid2D *>::iterator it = map_grid.find(morton);
+             Q.push_back(it->second);
+         }
+
+         while(Q.size()!=0){
+             if(!CollisionCheck(Q.front(),robot->getRadius())){
+                 //no collision
+                 list<grid2D *> neiGrid = AccessibleNeighbors(Q.front(),robot->getRadius());
+                 list<grid2D *>::iterator itN;
+                 for(itN = neiGrid.begin();itN != neiGrid.end();itN++){
+                     octomap::point3d q,itn;
+                     q.x() = Q.front()->a;
+                     q.y() = Q.front()->b;
+                     itn.x() = (*itN)->a;
+                     itn.y() = (*itN)->b;
+                     q.z()=itn.z()=0;
+                     if((*itN)->h > Q.front()->h + TravelCost(q,itn)){
+                         (*itN)->h = Q.front()->h + TravelCost(q,itn);
+                         if(!isContainedQ(*itN,Q) && !isContainedQ(*itN,closed) && !isContainedQ(*itN,traversability)){
+                             Q.push_back(*itN);
+                             //check if_pos
+                             if(((*itN)->a==pos_a) && ((*itN)->b == pos_b)){
+                                 cout<<"find pos,break\n";
+                                 break;
+                             }
+                         }
+                     }
+                 }
+                 cout<<"out of for\n";
+                 traversability.push_back(Q.front());
+             }else{
+                 Q.front()->h = FLT_MAX;//collide
+                 closed.push_back(Q.front());
+             }
+             Q.pop_front();
+         }
+         cout<<"out of while\n";
+         cout<<"cost traversability.size()"<<endl;
     }
 };
 

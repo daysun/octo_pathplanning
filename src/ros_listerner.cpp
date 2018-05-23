@@ -1,4 +1,3 @@
-
 #include "std_msgs/String.h"
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
@@ -21,6 +20,7 @@
 //octomap
 #include "octomap_ros/project2Dmap.h"
 #include "octomap_ros/ColorOcTree.h"
+#include "octomap_ros/UAV.h"
 using namespace std;
 
 ///receive data(orb-slam published it) from ros
@@ -33,6 +33,7 @@ bool isFirstSet = false;
 Project2Dmap pMap(tree.getResolution());
 double zmin = 0.1,zmax = 2.7;//get it from orb-slam
 ros::Publisher marker_pub;
+daysun::UAV * robot =  new daysun::UAV(0.15); //r=0.15
 
 //ofstream outfile("/home/daysun/GlobalTime.txt", ofstream::app);
 //ros::Duration bTcreate;
@@ -68,11 +69,19 @@ void chatterCallback(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
         cout<<"updateInnerOccupancy + pruneTree every 20KF\n";
     tree.updateInnerOccupancy();
     tree.pruneTree(tree.getRoot(), 0);
-
     countKF = 2;
     }
     tree.projector2D(pMap);
-    pMap.show2Dmap(marker_pub);
+    pMap.show2Dmap(marker_pub,robot);
+    if(pMap.find_goal == false){
+        if(pMap.checkGoal(robot)){
+            pMap.find_goal = true;
+            pMap.computeCost(robot); //compute the cost map
+        }
+    }
+//    AstarPlanar globalPlanr(robot.getPosition(),robot.getGoal());
+//    if(globalPlanr.findRoute(pMap,robot,demand) && route_pub.getNumSubscribers())
+//        globalPlanr.showRoute(pMap,route_pub);
 
 }
 
@@ -120,6 +129,7 @@ void chatterCallback_global(const octomap_ros::loopId_PointCloud2::ConstPtr & my
         //the first time
         tree.deleteTree();
         loopNum = my_msg->loop_id;
+        cout<<"global-delete tree,new one\n";
     }else{
         //not the first time
         if(loopNum != my_msg->loop_id){
@@ -128,7 +138,7 @@ void chatterCallback_global(const octomap_ros::loopId_PointCloud2::ConstPtr & my
         }
     }
 
-    cout<<"global:"<<my_msg->kf_id<<",loopNum:"<<loopNum<<endl;
+//    cout<<"global:"<<my_msg->kf_id<<",loopNum:"<<loopNum<<endl;
 
     pcl::PCLPointCloud2 pcl_pc2;
     pcl_conversions::toPCL(my_msg->msg,pcl_pc2);
@@ -170,6 +180,12 @@ int main(int argc, char **argv)
 
   ros::NodeHandle n;
 //  bTcreate=  ros::Time::now()-  ros::Time::now();
+  string pos;
+  string goal;
+  ros::param::get("~pos",pos);
+  ros::param::get("~goal",goal);
+  robot->setPos(pos);
+  robot->setGoal(goal);//new a robot
 
   marker_pub = n.advertise<visualization_msgs::MarkerArray>("twoDMap_marker_array", 1000);
 

@@ -458,11 +458,7 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                       b0 = b0-b1;
                   }
                   for(int i=a0;i<=a1;i++){
-                      if(i==0)
-                          i++;
                       for(int j=b0;j<=b1;j++){
-                          if(j==0)
-                              j++;
                           pmap.ab2Morton(i,j,Mo);
 //                          cout<<"i,j,morton "<<i<<","<<j<<","<<Mo<<endl;
                           int count = pmap.map_grid.count(Mo);
@@ -503,11 +499,7 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                       b0 = b0-b1;
                   }
                   for(int i=a0;i<=a1;i++){
-                      if(i==0)
-                          i++;
                       for(int j=b0;j<=b1;j++){
-                          if(j==0)
-                              j++;
                           pmap.ab2Morton(i,j,Mo);
     //                          cout<<"i,j,morton "<<i<<","<<j<<","<<Mo<<endl;
                           int count = pmap.map_grid.count(Mo);
@@ -553,11 +545,7 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                       b0 = b0-b1;
                   }
                   for(int i=a0;i<=a1;i++){
-                      if(i==0)
-                          i++;
                       for(int j=b0;j<=b1;j++){
-                          if(j==0)
-                              j++;
                           pmap.ab2Morton(i,j,Mo);
                           if(pmap.map_grid.count(Mo) !=0){
                               int occ = ((pmap.map_grid.find(Mo))->second)->occupied;
