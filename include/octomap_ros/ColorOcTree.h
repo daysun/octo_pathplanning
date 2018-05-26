@@ -187,8 +187,8 @@ namespace octomap {
     void deleteByIdWithoutSet(int id);
     ///project into 2d map
 //    void project(ColorOcTreeNode* node, unsigned int depth);
-    void projector2D(Project2Dmap & pmap);
-    void updateProjectorMap(Project2Dmap & pmap);
+    void projector2D(Project2Dmap * pmap);
+    void updateProjectorMap(Project2Dmap * pmap);
 
     int getTreeDepth(){
         return this->tree_depth;

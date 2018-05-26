@@ -21,6 +21,8 @@
 #include "octomap_ros/project2Dmap.h"
 #include "octomap_ros/ColorOcTree.h"
 #include "octomap_ros/UAV.h"
+//#include <thread>
+#include "octomap_ros/GlobalPlan.h"
 using namespace std;
 
 ///receive data(orb-slam published it) from ros
@@ -30,10 +32,14 @@ using namespace std;
 octomap::ColorOcTree tree( 0.05 );
 int loopNum = -1;
 bool isFirstSet = false;
-Project2Dmap pMap(tree.getResolution());
+Project2Dmap * pMap= new Project2Dmap(tree.getResolution());
 double zmin = 0.1,zmax = 2.7;//get it from orb-slam
-ros::Publisher marker_pub;
+ros::Publisher marker_pub,route_pub;
 daysun::UAV * robot =  new daysun::UAV(0.15); //r=0.15
+
+//for costmap and pathplanning
+//daysun::AstarPlanar * astar;
+//thread* pathPlan;
 
 //ofstream outfile("/home/daysun/GlobalTime.txt", ofstream::app);
 //ros::Duration bTcreate;
@@ -47,8 +53,8 @@ void chatterCallback(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);   
     if(!isFirstSet){
-        pMap.setOriginCoord(octomap::point3d(temp_cloud->points[0].x,temp_cloud->points[0].y,temp_cloud->points[0].z));
-        pMap.setZ(zmin,zmax);
+        pMap->setOriginCoord(octomap::point3d(temp_cloud->points[0].x,temp_cloud->points[0].y,temp_cloud->points[0].z));
+        pMap->setZ(zmin,zmax);
         isFirstSet = true;
     }
     for (int i=0;i<temp_cloud->points.size();i++)
@@ -72,17 +78,29 @@ void chatterCallback(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
     countKF = 2;
     }
     tree.projector2D(pMap);
-    pMap.show2Dmap(marker_pub,robot);
-    if(pMap.find_goal == false){
-        if(pMap.checkGoal(robot)){
-            pMap.find_goal = true;
-            pMap.computeCost(robot); //compute the cost map
+    pMap->show2Dmap(marker_pub,robot);
+
+    if(pMap->pp == false){
+        if(pMap->checkGoal(robot) && pMap->checkPos(robot) ){
+            pMap->pp = true;//find road-pp-true/not pp-false
+            ///change-compose a temp map2D
+//            cout<<"compose a new map-once\n";
+//            Project2Dmap * tempMap = new Project2Dmap(*pMap);
+//            cout<<"copy over\n";
+            //path planning
+            daysun::AstarPlanar globalPlanr;
+            if(globalPlanr.findRoute(pMap,robot)){
+                pMap->pp = true;
+                cout<<"find road\n";
+                if(route_pub.getNumSubscribers()){
+                    globalPlanr.showRoute(pMap,route_pub,robot->getRadius());
+                }
+            }else{
+                cout<<"not find road\n";
+                pMap->pp = false;
+            }
         }
     }
-//    AstarPlanar globalPlanr(robot.getPosition(),robot.getGoal());
-//    if(globalPlanr.findRoute(pMap,robot,demand) && route_pub.getNumSubscribers())
-//        globalPlanr.showRoute(pMap,route_pub);
-
 }
 
 int num=0;
@@ -118,7 +136,7 @@ void chatterCallback_local(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
                              my_msg->kf_id);
     }
 //    tree.projector2D(pMap);
-//    pMap.show2Dmap(marker_pub);
+//    pMap->show2Dmap(marker_pub,robot);
 }
 
 ///after ORB-SLAM global update
@@ -187,7 +205,12 @@ int main(int argc, char **argv)
   robot->setPos(pos);
   robot->setGoal(goal);//new a robot
 
+
+//  astar = new daysun::AstarPlanar();
+//  pathPlan = new thread(&daysun::AstarPlanar::Run,astar);
+
   marker_pub = n.advertise<visualization_msgs::MarkerArray>("twoDMap_marker_array", 1000);
+  route_pub= n.advertise<visualization_msgs::MarkerArray>("route_marker_array", 1000);
 
   ros::Subscriber sub = n.subscribe("/ORB_SLAM/pointcloud2", 1000, chatterCallback);
   ros::Subscriber sub_change = n.subscribe("ORB_SLAM/pointcloudlocalup2", 1000, chatterCallback_local);

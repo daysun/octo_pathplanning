@@ -21,8 +21,12 @@ struct grid2D{
      float h;
      float g; //real cost
      float f;  //f = g+h,a*
+     grid2D * father;
      grid2D(){
          occupied = -1;//-1 initial /0 free /1+ occupied
+         father = NULL;
+         a=0;
+         b=0;
      }
 };
 
@@ -41,60 +45,53 @@ class Project2Dmap {
             it++;
         }
         return false;
-    }
+    }    
 
-    //true-collide, false-no collide
-    //due to the zmin-zmax contains the height of robot
-    //here we can simply consider the value of occupied
-    bool CollisionCheck(grid2D * slope,float rr){
-        int r = ceil(rr);//radius
-        int a = slope->a;
-        int b = slope->b;
+    bool checkNeighbor(int a,int b,int r){
         for(int i=a-r;i<=a+r;i++){
             for(int j=b-r;j<=b+r;j++){
                 string mor;
                 ab2Morton(i,j,mor);
                 int count = map_grid.count(mor);
                 if(count!=0){//find
-                    if( ((map_grid.find(mor))->second)->occupied >0 ){
-                        //collide
-                        return true;
+                    if( ((map_grid.find(mor))->second)->occupied != 0 ){
+                        return false;
                     }
-                }else{//unknown
-                }
+                }else{
+                    return false;
+                }//unknown-cant go there
             }
         }
-        return false;
-    }
-
-    list<grid2D *>  AccessibleNeighbors(grid2D * slope,float rr){
-        list<grid2D *> list;
-        int r = ceil(rr);
-        int a = slope->a;
-        int b = slope->b;
-        for(int i=a-r;i<=a+r;i++){
-            for(int j=b-r;j<=b+r;j++){
-                string mor;
-                ab2Morton(i,j,mor);
-                int count = map_grid.count(mor);
-                if(count!=0){//find
-                    if( ((map_grid.find(mor))->second)->occupied == 0 ){
-                        //known and free
-                        list.push_back(slope);
-                    }
-                }//else{}//unknown-cant go there
-            }
-        }
-        return list;
+        return true;
     }
 
 public:
     double zmin,zmax;
     Project2Dmap(const float res):resolution(res){
         find_goal = false;
+        find_pos = false;
+        pp = false;
     }
+    Project2Dmap(const Project2Dmap& m){
+        resolution = m.resolution;
+        originCoord.x() = m.originCoord.x();
+        originCoord.y() = m.originCoord.y();
+        originCoord.z() = m.originCoord.z();
+        zmin = m.zmin;
+        zmax = m.zmax;
+        find_goal = m.find_goal;
+        find_pos = m.find_pos;
+        pp = m.pp;
+        map<string,grid2D *>::const_iterator it;
+        for(it=m.map_grid.begin();it!=m.map_grid.end();it++){
+            map_grid.insert(make_pair(it->first,it->second));
+        }
+    }
+
     map<string,grid2D *> map_grid;
     bool find_goal;
+    bool find_pos;
+    bool pp;
     void setOriginCoord(octomap::point3d o){
         originCoord.x()=o.x();
         originCoord.y()=o.y();
@@ -168,7 +165,11 @@ public:
                 return false;
             }else{
                 cout<<"find goal\n";
-                return true;
+                map<string,grid2D *>::iterator it = map_grid.find(morton);
+                if(AccessibleNeighbors(it->second,robot->getRadius()).size() >0)
+                    return true;
+                else
+                    return false;
             }
         }else{
             cout<<"test-goal error, out of range\n";
@@ -177,9 +178,31 @@ public:
         }
     }
 
+    bool checkPos(daysun::UAV * robot){
+        if(robot->getPosition().z()<=zmax && robot->getPosition().z()>=zmin){
+            string morton;
+            XY2Morton(robot->getPosition().x(),robot->getPosition().y(),morton);
+            //find the grid-initial
+            if(map_grid.count(morton)==0){
+                return false;
+            }else{
+//                cout<<"find pos\n";
+                map<string,grid2D *>::iterator it = map_grid.find(morton);
+                if(AccessibleNeighbors(it->second,robot->getRadius()).size() >0)
+                    return true;
+                else
+                    return false;
+            }
+        }else{
+            cout<<"test-pos error, out of range\n";
+            cout<<"z,zmax,zmin "<<robot->getPosition().z()<<","<<zmax<<","<<zmin<<endl;
+            return false;
+        }
+    }
+
     void show2Dmap(ros::Publisher marker_pub,daysun::UAV * robot){
         int i=2;
-        ros::Rate r(100);
+        ros::Rate r(50);
         //for goal
         visualization_msgs::MarkerArray mArray;
         {
@@ -200,9 +223,9 @@ public:
             m.pose.orientation.y = 0;
             m.pose.orientation.z = 1;
             m.pose.orientation.w = 1;
-            m.scale.x = robot->getRadius()/resolution;
-            m.scale.y = robot->getRadius()/resolution;
-            m.scale.z = 0.4;
+            m.scale.x = (int)ceil(robot->getRadius()*2/resolution);
+            m.scale.y = (int)ceil(robot->getRadius()*2/resolution);
+            m.scale.z = 0.8;
             m.color.a = 1.0;
             m.color.b = 0;
             m.color.r = 1;
@@ -230,11 +253,11 @@ public:
             m.pose.orientation.y = 0;
             m.pose.orientation.z = 1;
             m.pose.orientation.w = 1;
-            m.scale.x = robot->getRadius()/resolution;
-            m.scale.y = robot->getRadius()/resolution;
-            m.scale.z = 0.4;
+            m.scale.x = (int)ceil(robot->getRadius()*2/resolution);
+            m.scale.y = (int)ceil(robot->getRadius()*2/resolution);
+            m.scale.z = 0.8;
             m.color.a = 1.0;
-            m.color.b = 0.5;
+            m.color.b = 1;
             m.color.r = 1;
             m.color.g = 1;
             m.lifetime = ros::Duration();
@@ -286,6 +309,84 @@ public:
         }
     }
 
+    void showGridList(ros::Publisher marker_pub,list<grid2D *> & path,double rr){
+        ros::Rate r(50);
+        int i =0;
+        visualization_msgs::MarkerArray mArray;
+        list<grid2D *>::iterator it;
+        for(it = path.begin();it!= path.end();it++,i++){
+            visualization_msgs::Marker m_s;
+            m_s.ns  = "project2Dmap";
+            m_s.header.frame_id = "/my_frame";
+            m_s.header.stamp = ros::Time::now();
+            m_s.id = i;
+            m_s.type = visualization_msgs::Marker::SPHERE;
+            m_s.action = visualization_msgs::Marker::ADD;
+            m_s.pose.position.x = (*it)->a;
+            m_s.pose.position.y = (*it)->b;
+            m_s.pose.position.z = 0;
+            m_s.scale.x = (int)ceil(rr*2/resolution);
+            m_s.scale.y = (int)ceil(rr*2/resolution);
+            m_s.scale.z = 2;
+            m_s.pose.orientation.x = 0;
+            m_s.pose.orientation.y = 0;
+            m_s.pose.orientation.z = 1;
+            m_s.pose.orientation.w = 1;
+            m_s.color.a = 1.0;
+            m_s.color.b = 0;
+            m_s.color.r = 1;
+            m_s.color.g = 1;
+            m_s.lifetime = ros::Duration();
+            mArray.markers.push_back(m_s);
+        }
+
+        if(ros::ok()){
+            if (marker_pub.getNumSubscribers() == 1){
+                marker_pub.publish(mArray);
+            }
+        }
+    }
+
+    //true-collide, false-no collide
+    //due to the zmin-zmax contains the height of robot
+    //here we can simply consider the value of occupied
+    bool CollisionCheck(grid2D * slope,float rr){
+        int r = ceil(rr/resolution);//radius
+        int a = slope->a;
+        int b = slope->b;
+        for(int i=a-r;i<=a+r;i++){
+            for(int j=b-r;j<=b+r;j++){
+                string mor;
+                ab2Morton(i,j,mor);
+                int count = map_grid.count(mor);
+                if(count!=0){//find
+                    if( ((map_grid.find(mor))->second)->occupied >0 ){
+                        //collide
+                        return true;
+                    }
+                }else{//unknown
+                }
+            }
+        }
+        return false;
+    }
+
+    list<grid2D *>  AccessibleNeighbors(grid2D * slope,float rr){
+        list<grid2D *> neighbor;
+        int r = ceil(rr/resolution);
+        int a0 = slope->a;
+        int b0 = slope->b;
+        for(int a=a0-1;a<=a0+1;a++)
+            for(int b=b0-1;b<=b0+1;b++){
+                if(checkNeighbor(a,b,r)){
+                    string m;
+                    ab2Morton(a,b,m);
+                    neighbor.push_back((map_grid.find(m))->second);
+                }
+            }
+        return neighbor;
+    }
+
     void computeCost(daysun::UAV * robot){
         int pos_a,pos_b;
         octomap::point3d temp(robot->getPosition().x(),robot->getPosition().y(),robot->getPosition().z());
@@ -323,6 +424,7 @@ public:
                              Q.push_back(*itN);
                              //check if_pos
                              if(((*itN)->a==pos_a) && ((*itN)->b == pos_b)){
+                                 find_pos = true;
                                  cout<<"find pos,break\n";
                                  break;
                              }

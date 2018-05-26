@@ -430,22 +430,22 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
 
   ColorOcTree::StaticMemberInitializer ColorOcTree::ColorOcTreeMemberInit; 
 
-  void ColorOcTree::projector2D(Project2Dmap & pmap){
+  void ColorOcTree::projector2D(Project2Dmap * pmap){
       for( ColorOcTree::iterator it = this->begin(), end = this->end(); it != end; ++it )
       {
           double size = it.getSize(); //0.05
           double x = it.getX();
           double y = it.getY();
           double z = it.getZ();
-          if(z>=pmap.zmin && z<=pmap.zmax){
+          if(z>=pmap->zmin && z<=pmap->zmax){
               if(this->isNodeOccupied(*it) && !it->has_project && !it->hasChildren()){
                   //project
                   string Mo;//a0,b0;a1,b1
                   int a0,b0,a1,b1;
                   octomap::point3d nodeMin(x-0.5*size,y-0.5*size,0);
                   octomap::point3d nodeMax(x+0.5*size,y+0.5*size,0);
-                  pmap.XY2ab(nodeMin,a0,b0);
-                  pmap.XY2ab(nodeMax,a1,b1);
+                  pmap->XY2ab(nodeMin,a0,b0);
+                  pmap->XY2ab(nodeMax,a1,b1);
 //                  cout<<"a0,b0 "<<a0<<","<<b0<<endl;cout<<"a1,b1 "<<a1<<","<<b1<<endl;
                   if(a0>a1){
                       a0 = a0+a1;
@@ -459,19 +459,19 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                   }
                   for(int i=a0;i<=a1;i++){
                       for(int j=b0;j<=b1;j++){
-                          pmap.ab2Morton(i,j,Mo);
+                          pmap->ab2Morton(i,j,Mo);
 //                          cout<<"i,j,morton "<<i<<","<<j<<","<<Mo<<endl;
-                          int count = pmap.map_grid.count(Mo);
+                          int count = pmap->map_grid.count(Mo);
                           if(count!=0){
-                              ((pmap.map_grid.find(Mo))->second)->occupied +=1;
+                              ((pmap->map_grid.find(Mo))->second)->occupied +=1;
                           }else{
                               grid2D * g = new grid2D();
                               g->occupied = 1;
                               g->a = i;g->b=j;
-                              pmap.map_grid.insert(pair<string,grid2D *>(Mo,g));
+                              pmap->map_grid.insert(pair<string,grid2D *>(Mo,g));
 //                              cout<<"create-a,b"<<g->a<<","<<g->b<<endl;
                           }
-//                          cout<<"add+occupied "<<((pmap.map_grid.find(Mo))->second)->occupied<<endl;
+//                          cout<<"add+occupied "<<((pmap->map_grid.find(Mo))->second)->occupied<<endl;
                       }
                   }
                   it->has_project = true;
@@ -485,8 +485,8 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                   int a0,b0,a1,b1;
                   octomap::point3d nodeMin(x-0.5*size,y-0.5*size,0);
                   octomap::point3d nodeMax(x+0.5*size,y+0.5*size,0);
-                  pmap.XY2ab(nodeMin,a0,b0);
-                  pmap.XY2ab(nodeMax,a1,b1);
+                  pmap->XY2ab(nodeMin,a0,b0);
+                  pmap->XY2ab(nodeMax,a1,b1);
     //                  cout<<"a0,b0 "<<a0<<","<<b0<<endl;cout<<"a1,b1 "<<a1<<","<<b1<<endl;
                   if(a0>a1){
                       a0 = a0+a1;
@@ -500,14 +500,14 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                   }
                   for(int i=a0;i<=a1;i++){
                       for(int j=b0;j<=b1;j++){
-                          pmap.ab2Morton(i,j,Mo);
+                          pmap->ab2Morton(i,j,Mo);
     //                          cout<<"i,j,morton "<<i<<","<<j<<","<<Mo<<endl;
-                          int count = pmap.map_grid.count(Mo);
+                          int count = pmap->map_grid.count(Mo);
                           if(count==0){
                               grid2D * g = new grid2D();
                               g->occupied = 0;
                               g->a = i;g->b=j;
-                              pmap.map_grid.insert(pair<string,grid2D *>(Mo,g));
+                              pmap->map_grid.insert(pair<string,grid2D *>(Mo,g));
                           }
                       }
                   }
@@ -518,22 +518,22 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
   }
 
   //local update
-  void ColorOcTree::updateProjectorMap(Project2Dmap & pmap){
+  void ColorOcTree::updateProjectorMap(Project2Dmap * pmap){
       for( ColorOcTree::iterator it = this->begin(), end = this->end(); it != end; ++it )
       {
           double size = it.getSize(); //0.05
           double x = it.getX();
           double y = it.getY();
           double z = it.getZ();
-          if(z>=pmap.zmin && z<=pmap.zmax){
+          if(z>=pmap->zmin && z<=pmap->zmax){
               if( it->setUpdatePro == true && !it->hasChildren() && !this->isNodeOccupied(*it)){
                   //project
                   string Mo;//a0,b0;a1,b1
                   int a0,b0,a1,b1;
                   octomap::point3d nodeMin(x-0.5*size,y-0.5*size,0);
                   octomap::point3d nodeMax(x+0.5*size,y+0.5*size,0);
-                  pmap.XY2ab(nodeMin,a0,b0);
-                  pmap.XY2ab(nodeMax,a1,b1);
+                  pmap->XY2ab(nodeMin,a0,b0);
+                  pmap->XY2ab(nodeMax,a1,b1);
                   if(a0>a1){
                       a0 = a0+a1;
                       a1 = a0-a1;
@@ -546,14 +546,14 @@ void ColorOcTree::searchDeleteById( list<ColorOcTreeNode*> & idList ,ColorOcTree
                   }
                   for(int i=a0;i<=a1;i++){
                       for(int j=b0;j<=b1;j++){
-                          pmap.ab2Morton(i,j,Mo);
-                          if(pmap.map_grid.count(Mo) !=0){
-                              int occ = ((pmap.map_grid.find(Mo))->second)->occupied;
+                          pmap->ab2Morton(i,j,Mo);
+                          if(pmap->map_grid.count(Mo) !=0){
+                              int occ = ((pmap->map_grid.find(Mo))->second)->occupied;
                               occ -=1;
-                              ((pmap.map_grid.find(Mo))->second)->occupied = occ<0?0:occ;
+                              ((pmap->map_grid.find(Mo))->second)->occupied = occ<0?0:occ;
                           }//else
 //                              cout<<Mo<<"-delete update 2dmap error\n";//caused by pruneTree
-//                          cout<<"occupied "<<((pmap.map_grid.find(Mo))->second)->occupied<<endl;
+//                          cout<<"occupied "<<((pmap->map_grid.find(Mo))->second)->occupied<<endl;
                       }
                   }
                   it->setUpdatePro = false;
