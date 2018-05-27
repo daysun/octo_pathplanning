@@ -101,6 +101,9 @@ public:
         zmin = min;
         zmax = max;
     }
+    double getResolution(){
+        return resolution;
+    }
 
     void XY2ab(octomap::point3d & position, int & nx ,int & ny){
          nx = (int)ceil(float(abs(position.x()-originCoord.x())/resolution));
@@ -387,61 +390,61 @@ public:
         return neighbor;
     }
 
-    void computeCost(daysun::UAV * robot){
-        int pos_a,pos_b;
-        octomap::point3d temp(robot->getPosition().x(),robot->getPosition().y(),robot->getPosition().z());
-        XY2ab(temp,pos_a,pos_b);
-         list<grid2D *> Q; //list of cell to be computed
-         list<grid2D *> closed;//no checking again
-         list<grid2D *> traversability; //can travel
-         string morton;
-         XY2Morton(robot->getGoal().x(),robot->getGoal().y(),morton);
-         //find the grid-initial
-         if(map_grid.count(morton)==0){
-             cout<<"cant find goal grid\n";
-             find_goal = false;
-             return;
-         }else{
-             map<string,grid2D *>::iterator it = map_grid.find(morton);
-             Q.push_back(it->second);
-         }
+//    void computeCost(daysun::UAV * robot){
+//        int pos_a,pos_b;
+//        octomap::point3d temp(robot->getPosition().x(),robot->getPosition().y(),robot->getPosition().z());
+//        XY2ab(temp,pos_a,pos_b);
+//         list<grid2D *> Q; //list of cell to be computed
+//         list<grid2D *> closed;//no checking again
+//         list<grid2D *> traversability; //can travel
+//         string morton;
+//         XY2Morton(robot->getGoal().x(),robot->getGoal().y(),morton);
+//         //find the grid-initial
+//         if(map_grid.count(morton)==0){
+//             cout<<"cant find goal grid\n";
+//             find_goal = false;
+//             return;
+//         }else{
+//             map<string,grid2D *>::iterator it = map_grid.find(morton);
+//             Q.push_back(it->second);
+//         }
 
-         while(Q.size()!=0){
-             if(!CollisionCheck(Q.front(),robot->getRadius())){
-                 //no collision
-                 list<grid2D *> neiGrid = AccessibleNeighbors(Q.front(),robot->getRadius());
-                 list<grid2D *>::iterator itN;
-                 for(itN = neiGrid.begin();itN != neiGrid.end();itN++){
-                     octomap::point3d q,itn;
-                     q.x() = Q.front()->a;
-                     q.y() = Q.front()->b;
-                     itn.x() = (*itN)->a;
-                     itn.y() = (*itN)->b;
-                     q.z()=itn.z()=0;
-                     if((*itN)->h > Q.front()->h + TravelCost(q,itn)){
-                         (*itN)->h = Q.front()->h + TravelCost(q,itn);
-                         if(!isContainedQ(*itN,Q) && !isContainedQ(*itN,closed) && !isContainedQ(*itN,traversability)){
-                             Q.push_back(*itN);
-                             //check if_pos
-                             if(((*itN)->a==pos_a) && ((*itN)->b == pos_b)){
-                                 find_pos = true;
-                                 cout<<"find pos,break\n";
-                                 break;
-                             }
-                         }
-                     }
-                 }
-                 cout<<"out of for\n";
-                 traversability.push_back(Q.front());
-             }else{
-                 Q.front()->h = FLT_MAX;//collide
-                 closed.push_back(Q.front());
-             }
-             Q.pop_front();
-         }
-         cout<<"out of while\n";
-         cout<<"cost traversability.size()"<<endl;
-    }
+//         while(Q.size()!=0){
+//             if(!CollisionCheck(Q.front(),robot->getRadius())){
+//                 //no collision
+//                 list<grid2D *> neiGrid = AccessibleNeighbors(Q.front(),robot->getRadius());
+//                 list<grid2D *>::iterator itN;
+//                 for(itN = neiGrid.begin();itN != neiGrid.end();itN++){
+//                     octomap::point3d q,itn;
+//                     q.x() = Q.front()->a;
+//                     q.y() = Q.front()->b;
+//                     itn.x() = (*itN)->a;
+//                     itn.y() = (*itN)->b;
+//                     q.z()=itn.z()=0;
+//                     if((*itN)->h > Q.front()->h + TravelCost(q,itn)){
+//                         (*itN)->h = Q.front()->h + TravelCost(q,itn);
+//                         if(!isContainedQ(*itN,Q) && !isContainedQ(*itN,closed) && !isContainedQ(*itN,traversability)){
+//                             Q.push_back(*itN);
+//                             //check if_pos
+//                             if(((*itN)->a==pos_a) && ((*itN)->b == pos_b)){
+//                                 find_pos = true;
+//                                 cout<<"find pos,break\n";
+//                                 break;
+//                             }
+//                         }
+//                     }
+//                 }
+//                 cout<<"out of for\n";
+//                 traversability.push_back(Q.front());
+//             }else{
+//                 Q.front()->h = FLT_MAX;//collide
+//                 closed.push_back(Q.front());
+//             }
+//             Q.pop_front();
+//         }
+//         cout<<"out of while\n";
+//         cout<<"cost traversability.size()"<<endl;
+//    }
 };
 
 #endif // PROJECT2DMAP_H

@@ -1,10 +1,10 @@
 <launch> 
+<!--hpcl.bag-->
 <node pkg="octomap_ros" type="rcv_test" name="rcv_test" output="screen">
     <param name="goal" type="string" value="5.2,-2.6,2" />
-    <!--5.5,-2.5,2///3.9,-1.6,2///pos 3,-1,2-->
     <param name="pos" type="string" value="3,-0.6,2" />
 </node>
 
-<node pkg="rviz" type="rviz" name="rviz" args="-d $(find octomap_ros)/launch/octomap_ros.rviz" output="log"></node>
+<node pkg="rviz" type="rviz" name="rviz" args="-d $(find octomap_ros)/launch/octomap_hpcl.rviz" output="log"></node>
 
 </launch>

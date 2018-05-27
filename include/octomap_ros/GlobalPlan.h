@@ -15,7 +15,7 @@ struct MyCompare {
 
 class AstarPlanar{
     multimap<float,grid2D *,MyCompare> open_queue;
-    list<grid2D *> closed_list;
+    list<grid2D *> closed_list;    
     list<grid2D *> global_path;
 //    octomap::point3d start,goal;
     bool isContainedClosed(grid2D * s,list<grid2D *> & closed_list){
@@ -53,7 +53,14 @@ class AstarPlanar{
     }
 
 public:
+    int getRoadSize(){
+        return global_path.size();
+    }
+
     bool findRoute(Project2Dmap * map2D,daysun::UAV * robot){
+        open_queue.clear();
+        closed_list.clear();
+        global_path.clear();
 //        double time_start3 = stopwatch();
         //find where the start is
         int ag,bg;
@@ -148,6 +155,22 @@ public:
         cout<<"route show done\n";
     }
 
+    bool checkRoadFeasibility(Project2Dmap * map2D,double rr){ //true-ok/false-replan
+        int r = ceil(rr/map2D->getResolution());
+        list<grid2D *>::iterator it;
+        for(it=global_path.begin();it!=global_path.end();it++){
+            int a = (*it)->a;
+            int b = (*it)->b;
+            for(int i = a-r;i<=a+r;i++)
+                for(int j = b-r;j<=b+r;j++){
+                    string mor;
+                    map2D->ab2Morton(i,j,mor);
+                    if((map2D->map_grid.find(mor)->second)->occupied >0)
+                        return false;
+                }
+        }
+        return true;
+    }
 };
 }
 

@@ -36,6 +36,7 @@ Project2Dmap * pMap= new Project2Dmap(tree.getResolution());
 double zmin = 0.1,zmax = 2.7;//get it from orb-slam
 ros::Publisher marker_pub,route_pub;
 daysun::UAV * robot =  new daysun::UAV(0.15); //r=0.15
+daysun::AstarPlanar * globalPlanr = new daysun::AstarPlanar();
 
 //for costmap and pathplanning
 //daysun::AstarPlanar * astar;
@@ -77,23 +78,23 @@ void chatterCallback(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
     tree.pruneTree(tree.getRoot(), 0);
     countKF = 2;
     }
+
+    ///project into 2D
     tree.projector2D(pMap);
     pMap->show2Dmap(marker_pub,robot);
 
+    ///2D map path planning
     if(pMap->pp == false){
         if(pMap->checkGoal(robot) && pMap->checkPos(robot) ){
             pMap->pp = true;//find road-pp-true/not pp-false
-            ///change-compose a temp map2D
 //            cout<<"compose a new map-once\n";
 //            Project2Dmap * tempMap = new Project2Dmap(*pMap);
 //            cout<<"copy over\n";
-            //path planning
-            daysun::AstarPlanar globalPlanr;
-            if(globalPlanr.findRoute(pMap,robot)){
+            if(globalPlanr->findRoute(pMap,robot)){
                 pMap->pp = true;
                 cout<<"find road\n";
                 if(route_pub.getNumSubscribers()){
-                    globalPlanr.showRoute(pMap,route_pub,robot->getRadius());
+                    globalPlanr->showRoute(pMap,route_pub,robot->getRadius());
                 }
             }else{
                 cout<<"not find road\n";
@@ -137,6 +138,16 @@ void chatterCallback_local(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
     }
 //    tree.projector2D(pMap);
 //    pMap->show2Dmap(marker_pub,robot);
+
+    ///after local update
+    /// check if road was affected by this update
+    if(pMap->pp == true)
+        if(globalPlanr->getRoadSize() >0){
+            if(!globalPlanr->checkRoadFeasibility(pMap,robot->getRadius())){ //true-ok/false-replan
+                cout<<"updating affects road,replaning...\n";
+                pMap->pp = false;
+            }
+        }
 }
 
 ///after ORB-SLAM global update
