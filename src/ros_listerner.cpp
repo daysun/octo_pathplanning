@@ -33,7 +33,8 @@ octomap::ColorOcTree tree( 0.05 );
 int loopNum = -1;
 bool isFirstSet = false;
 Project2Dmap * pMap= new Project2Dmap(tree.getResolution());
-double zmin = 0.1,zmax = 2.7;//get it from orb-slam
+//double zmin = 0.1,zmax = 2.7;//get it from orb-slam
+double zmin = 0.7,zmax = 3;
 ros::Publisher marker_pub,route_pub;
 daysun::UAV * robot =  new daysun::UAV(0.15); //r=0.15
 daysun::AstarPlanar * globalPlanr = new daysun::AstarPlanar();
@@ -54,6 +55,7 @@ void chatterCallback(const octomap_ros::Id_PointCloud2::ConstPtr & my_msg)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);   
     if(!isFirstSet){
+        cout<<"set first "<<temp_cloud->points[0].x<<","<<temp_cloud->points[0].y<<","<<temp_cloud->points[0].z<<endl;
         pMap->setOriginCoord(octomap::point3d(temp_cloud->points[0].x,temp_cloud->points[0].y,temp_cloud->points[0].z));
         pMap->setZ(zmin,zmax);
         isFirstSet = true;
@@ -157,12 +159,14 @@ void chatterCallback_global(const octomap_ros::loopId_PointCloud2::ConstPtr & my
     if(loopNum == -1){
         //the first time
         tree.deleteTree();
+        pMap->map_grid.clear();
         loopNum = my_msg->loop_id;
         cout<<"global-delete tree,new one\n";
     }else{
         //not the first time
         if(loopNum != my_msg->loop_id){
             tree.deleteTree();
+            pMap->map_grid.clear();
             loopNum = my_msg->loop_id;
         }
     }
@@ -185,6 +189,8 @@ void chatterCallback_global(const octomap_ros::loopId_PointCloud2::ConstPtr & my
         tree.integrateNodeId(temp_cloud->points[i].x,temp_cloud->points[i].y,temp_cloud->points[i].z,
                              my_msg->kf_id);
     }
+    ///reproject into 2d
+    tree.projector2D(pMap);
 //            ros::Time tGlobal2 = ros::Time::now();
 //         bTcreate = bTcreate+(tGlobal2-tGlobal1);
 }

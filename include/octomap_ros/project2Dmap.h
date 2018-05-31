@@ -167,11 +167,11 @@ public:
             if(map_grid.count(morton)==0){
                 return false;
             }else{
-                cout<<"find goal\n";
                 map<string,grid2D *>::iterator it = map_grid.find(morton);
-                if(AccessibleNeighbors(it->second,robot->getRadius()).size() >0)
+                if(AccessibleNeighbors(it->second,robot->getRadius()).size() >0){
+                    cout<<"find goal\n";
                     return true;
-                else
+                }else
                     return false;
             }
         }else{
